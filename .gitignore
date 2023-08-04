@@ -1,6 +1,26 @@
 # Created by https://www.toptal.com/developers/gitignore/api/java,androidstudio,kotlin
 # Edit at https://www.toptal.com/developers/gitignore?templates=java,androidstudio,kotlin
 
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+/.idea/StickySelectionHighlights.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+
+*.apk
+output.json
+/app/release/
+
 ### Java ###
 # Compiled class file
 *.class
