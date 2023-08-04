@@ -69,9 +69,13 @@ public class OCRHelper {
             }
         }
     }
-    private Set<String> jump = new HashSet<>(Arrays.asList("작은", "표준", "범위", "전투하면"));
+    private Set<String> jump = new HashSet<>(Arrays.asList(
+            "작은", "표준", "범위", "전투하면", "진루하면"
+    ));
     private Map<String, String> etc = new HashMap<String, String>(){{
         put("표즘재형", "표준체형");put("다스튕척", "디스럽터");
+        put("네삐", "데미지");put("쐐넨듀", "빈유");
+        put("작은처", "작은체형"); put("찹욜호", "방어 빈유");
     }};
     private final int SIMILAR = 3;
     public String recognizeText(Bitmap bitmap) {
@@ -86,6 +90,7 @@ public class OCRHelper {
 
         boolean start = false;
         int cnt = 0;
+        // 태그라고 인식된 것을 띄어쓰기로 구분해서 문자열 저장
         for(String s : sList) {
             if (s.length() == 1) continue;
             if (!start) {
@@ -100,25 +105,26 @@ public class OCRHelper {
             if (cnt == 5) break;
         }
         String[] tmps = sb.toString().split(" ");
+        // 각 단어를 돌면서 예외처리 + 문자교정
         for(int i = 0; i < tmps.length; i++) {
             String s = tmps[i];
             if (s.length() == 5 || s.length() == 6) s = s.substring(0, 4);
             if (!corr.contains(s)) {
                 String tagTmp = null;
                 int minSimilar = 50;
-                for(String cs : corr) {
-                    int sim = similar(splitKor(s), splitKor(cs));
+                for(String ss : corr) {
+                    int sim = similar(splitKor(s), splitKor(ss));
                     if (sim <= SIMILAR && sim < minSimilar) {
                         minSimilar = sim;
-                        tagTmp = cs;
+                        tagTmp = ss;
                     }
                 }
                 if (tagTmp == null) {
-                    for(String ce : etc.keySet()) {
-                        int sim = similar(splitKor(s), splitKor(ce));
+                    for(String ss : etc.keySet()) {
+                        int sim = similar(splitKor(s), splitKor(ss));
                         if (sim <= SIMILAR && sim < minSimilar) {
                             minSimilar = sim;
-                            tagTmp = etc.get(ce);
+                            tagTmp = etc.get(ss);
                         }
                     }
                 }
