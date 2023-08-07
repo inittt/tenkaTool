@@ -70,12 +70,13 @@ public class OCRHelper {
         }
     }
     private Set<String> jump = new HashSet<>(Arrays.asList(
-            "작은", "표준", "범위", "전투하면", "진루하면"
+            "작은", "표준", "범위", "전투하면", "진루히먼"
     ));
     private Map<String, String> etc = new HashMap<String, String>(){{
         put("표즘재형", "표준체형");put("다스튕척", "디스럽터");
         put("네삐", "데미지");put("쐐넨듀", "빈유");
         put("작은처", "작은체형"); put("찹욜호", "방어 빈유");
+        put("짝속짐", "화속성");
     }};
     private final int SIMILAR = 3;
     public String recognizeText(Bitmap bitmap) {
@@ -98,10 +99,27 @@ public class OCRHelper {
                 continue;
             } else if (s.contains("남음") || s.contains("납음")) break;
 
-            if (!jump.contains(s)) {
+            // 띄어쓰기 제거
+            boolean flag = false;
+            for(String jumpTmp : jump) {
+                int dist = similar(splitKor(s), splitKor(jumpTmp));
+                Log.i("dist", s + " " + jumpTmp + " " + dist);
+                if (dist <= 2) {
+                    flag = true;
+                    if ("진루히먼".equals(s)) s = "전투하면";
+                    else s = jumpTmp;
+                    break;
+                }
+            }
+            if (flag) sb.append(s);
+            else {
                 cnt++;
                 sb.append(s).append(cnt < 5 ? " " : "");
-            } else sb.append(s);
+            }
+//            if (!jump.contains(s) || similar(splitKor(s), splitKor("전투하면")) <= SIMILAR) {
+//                cnt++;
+//                sb.append(s).append(cnt < 5 ? " " : "");
+//            } else sb.append(s);
             if (cnt == 5) break;
         }
         String[] tmps = sb.toString().split(" ");
