@@ -1,6 +1,5 @@
 package jp.juggler.screenshotbutton
 
-import android.R.attr
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
@@ -361,7 +360,17 @@ object Capture {
 //                        if (smallBitmap.isBlank()) error(ERROR_BLANK_IMAGE)
 //                        bench("checkBlank")
 //                    }
-                    var screenText = getImageOCR(srcBitmap)
+                    // 업샘플링할 비율 정의
+                    val scaleFactor = 2.0f // 2배 업샘플링
+                    // 업샘플링된 비트맵 생성
+                    val scaledBitmap = Bitmap.createScaledBitmap(
+                        srcBitmap,
+                        (srcBitmap.width * scaleFactor).toInt(),
+                        (srcBitmap.height * scaleFactor).toInt(),
+                        true // 필터링 사용 (보간법 적용)
+                    )
+
+                    var screenText = getImageOCR(scaledBitmap)
                     CaptureResult(
                         text = screenText
                     )

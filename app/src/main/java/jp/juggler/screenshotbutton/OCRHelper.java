@@ -106,7 +106,7 @@ public class OCRHelper {
                 Log.i("dist", s + " " + jumpTmp + " " + dist);
                 if (dist <= 2) {
                     flag = true;
-                    if ("진루히먼".equals(s)) s = "전투하면";
+                    if ("진루히먼".equals(jumpTmp)) s = "전투하면";
                     else s = jumpTmp;
                     break;
                 }
