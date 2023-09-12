@@ -53,7 +53,7 @@ object Capture {
     private val videoStopReason = AtomicReference<Throwable>(null)
     private var lastEncoderOutput = 0L
 
-    // アプリ起動時に一度だけ実行する
+
     fun onInitialize(context: Context) {
         log.d("onInitialize")
         mediaScannerTracker = MediaScannerTracker(context.applicationContext, handler)
@@ -117,7 +117,6 @@ object Capture {
 
             else -> {
                 log.i("screenCaptureIntent set!")
-                // 得られたインテントはExtrasにBinderProxyオブジェクトを含む。ファイルに保存とかは無理っぽい…
                 screenCaptureIntent = data
                 mediaProjectionState = MediaProjectionState.HasScreenCaptureIntent
                 true
@@ -140,10 +139,8 @@ object Capture {
             throw ScreenCaptureIntentError("screenCaptureIntent is null")
         }
 
-        // 以前のMediaProjectionを停止させないとgetMediaProjectionはエラーを返す
         mediaProjection?.stop()
 
-        // MediaProjectionの取得
         val mediaProjection =
             mediaProjectionManager.getMediaProjection(Activity.RESULT_OK, screenCaptureIntent)
         this.mediaProjection = mediaProjection
@@ -320,7 +317,7 @@ object Capture {
 
         }
 
-        private suspend fun save(image: Image): CaptureResult {
+        private suspend fun save(size: Float, image: Image): CaptureResult {
 
             bench("save start")
 
@@ -361,7 +358,7 @@ object Capture {
 //                        bench("checkBlank")
 //                    }
                     // 업샘플링할 비율 정의
-                    val scaleFactor = 2.0f // 2배 업샘플링
+                    val scaleFactor = size // 업샘플링
                     // 업샘플링된 비트맵 생성
                     val scaledBitmap = Bitmap.createScaledBitmap(
                         srcBitmap,
@@ -390,7 +387,7 @@ object Capture {
         }
 
         @SuppressLint("WrongConstant")
-        suspend fun captureStill(): CaptureResult {
+        suspend fun captureStill(size: Float): CaptureResult {
 
             val mediaProjection = mediaProjection
                 ?: error("mediaProjection is null.")
@@ -468,7 +465,7 @@ object Capture {
                         val timeGetImage = SystemClock.elapsedRealtime()
                         try {
                             return withContext(Dispatchers.IO) {
-                                save(image)
+                                save(size, image)
                             }.also {
                                 bench("save OK. shutter delay=${timeGetImage - timeClick}ms")
                             }
@@ -496,8 +493,8 @@ object Capture {
             }
         }
 
-        suspend fun capture(): CaptureResult {
-            return captureStill()
+        suspend fun capture(size: Float): CaptureResult {
+            return captureStill(size)
         }
     }
 
@@ -505,6 +502,7 @@ object Capture {
     var isCapturing = false
 
     suspend fun capture(
+        size: Float,
         context: Context,
         timeClick: Long,
         isVideo: Boolean = false
@@ -512,7 +510,7 @@ object Capture {
         isCapturing = true
         CaptureServiceBase.showButtonAll()
         try {
-            return CaptureEnv(context, timeClick, isVideo).capture()
+            return CaptureEnv(context, timeClick, isVideo).capture(size)
         } finally {
             isCapturing = false
             CaptureServiceBase.showButtonAll()

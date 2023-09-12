@@ -11,8 +11,12 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.SystemClock
+import android.util.DisplayMetrics
+import android.util.Log
 import android.view.*
-import android.widget.TextView
+import android.view.inputmethod.InputMethodManager
+import android.widget.Button
+import android.widget.EditText
 import androidx.core.app.NotificationCompat
 import jp.juggler.util.*
 import kotlinx.coroutines.*
@@ -21,6 +25,7 @@ import java.util.*
 import kotlin.coroutines.suspendCoroutine
 import kotlin.math.abs
 import kotlin.math.max
+
 
 abstract class CaptureServiceBase(
     val isVideo: Boolean
@@ -36,8 +41,6 @@ abstract class CaptureServiceBase(
         private var isVideoCaptureJob = false
 
         fun isCapturing() = captureJob?.get()?.isActive == true
-
-        fun isVideoCapturing() = isCapturing() && isVideoCaptureJob
 
         private val serviceList = LinkedList<WeakReference<CaptureServiceBase>>()
 
@@ -113,12 +116,22 @@ abstract class CaptureServiceBase(
     private lateinit var btnPlay: MyImageButton
     private lateinit var btnDelete: MyImageButton
     private lateinit var textBox: MyTextBox
+    private lateinit var btnEdit: MyImageButton
+    private lateinit var popup: MyEditPopup
+    private lateinit var editBox: EditText
+    private lateinit var editFinishBtn: Button
+
     private lateinit var playParam: WindowManager.LayoutParams
     private lateinit var deleteParam: WindowManager.LayoutParams
     private lateinit var textParam: WindowManager.LayoutParams
+    private lateinit var editParam: WindowManager.LayoutParams
+    private lateinit var popupParam: WindowManager.LayoutParams
+
     private lateinit var playView: View
     private lateinit var deleteView: View
     private lateinit var textView: View
+    private lateinit var editView: View
+    private lateinit var popupView: View
 
     private var startLpX = 0
     private var startLpY = 0
@@ -128,7 +141,8 @@ abstract class CaptureServiceBase(
     private var draggingThreshold = 0f
     private var maxX = 0
     private var maxY = 0
-    private var buttonSize = 0
+    private var bigButtonSize = 0
+    private var smallButtonSize = 0
     private var txt = "tmp"
     private var textBoxOn = false
 
@@ -139,16 +153,10 @@ abstract class CaptureServiceBase(
 
     override fun onBind(intent: Intent): IBinder? = null
 
-//    @Deprecated("Deprecated in API level 15")
-//    override fun onStart(intent: Intent?, startId: Int) {
-//        handleIntent(intent)
-//    }
-
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         handleIntent(intent)
         return START_STICKY
     }
-
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         log.d("onTaskRemoved")
@@ -204,30 +212,56 @@ abstract class CaptureServiceBase(
         deleteView = LayoutInflater.from(context).inflate(R.layout.service_overlay_x, null)
         @SuppressLint("InflateParams")
         textView = LayoutInflater.from(context).inflate(R.layout.test, null)
+        @SuppressLint("InflateParams")
+        editView = LayoutInflater.from(context).inflate(R.layout.service_edit, null)
+        @SuppressLint("InflateParams")
+        popupView = LayoutInflater.from(context).inflate(R.layout.service_edit_popup, null)
 
         startForeground(notificationId, createRunningNotification(false))
 
 
         btnPlay = playView.findViewById(R.id.btnCamera)
+        btnDelete = deleteView.findViewById(R.id.btnDelete)
+        textBox = textView.findViewById(R.id.text)
+        btnEdit = editView.findViewById(R.id.btnEdit)
+        popup = popupView.findViewById(R.id.popup)
+        editBox = popupView.findViewById(R.id.editBox)
+        editFinishBtn = popupView.findViewById(R.id.editFinish)
+
+
         btnPlay.setOnClickListener(this)
         btnPlay.setOnTouchListener(this)
-
-        btnDelete = deleteView.findViewById(R.id.btnDelete)
-
-        textBox = textView.findViewById(R.id.text)
         textBox.setOnClickListener(this)
+        btnEdit.setOnClickListener(this)
+        editFinishBtn.setOnClickListener(this)
 
-        setPlayParam()
-        setDeleteParam()
-        setTextParam()
 
-        setDeletePos()
+        playParam = initParam()
+        deleteParam = initParam()
+        textParam = initParam()
+        editParam = initParam()
+        popupParam = initPopupParam()
+
+        val dm = resources.displayMetrics
+        bigButtonSize = Pref.ipCameraButtonSize(App1.pref).toFloat().dp2px(dm)
+        smallButtonSize = Pref.smallButton(App1.pref).toFloat().dp2px(dm)
+
+
+        setDeletePos(dm)
         btnDelete.windowLayoutParams = deleteParam
         windowManager.addView(deleteView, deleteParam)
 
-        setTextPos()
+        setTextPos(dm)
         textBox.windowLayoutParams = textParam
         windowManager.addView(textView, textParam)
+
+        setEditPos(dm)
+        btnEdit.windowLayoutParams = editParam
+        windowManager.addView(editView, editParam)
+
+        setPopupPos(dm)
+        popup.windowLayoutParams = editParam
+        windowManager.addView(popupView, popupParam)
 
         loadButtonPosition()
         btnPlay.windowLayoutParams = playParam
@@ -237,24 +271,27 @@ abstract class CaptureServiceBase(
         btnDelete.setImageResource(R.drawable.ic_delete)
         btnDelete.visibility = View.GONE
 
+        btnEdit.setImageResource(R.drawable.btn_edit)
+        btnEdit.visibility = View.GONE
+
+        popup.visibility = View.GONE
+
         textBox.visibility = View.GONE
         textBoxOn = false
         showButtonAll()
     }
 
-    private fun setPlayParam() {
-        playParam = WindowManager.LayoutParams(
-            0, // 後で上書きする。 loadButtonPosition()
+    private fun initParam() : WindowManager.LayoutParams {
+        return WindowManager.LayoutParams(
+            0,
             0,
             if (Build.VERSION.SDK_INT >= API_APPLICATION_OVERLAY) {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             } else {
                 @Suppress("DEPRECATION")
                 WindowManager.LayoutParams.TYPE_SYSTEM_ALERT
-                // TYPE_SYSTEM_OVERLAYはロック画面にもViewを表示できますが、タッチイベントを取得できません
             },
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    // WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
                     WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                     WindowManager.LayoutParams.FLAG_FULLSCREEN,
             PixelFormat.TRANSLUCENT
@@ -263,19 +300,17 @@ abstract class CaptureServiceBase(
         }
     }
 
-    private fun setDeleteParam() {
-        deleteParam = WindowManager.LayoutParams(
-            0, // 後で上書きする。 loadButtonPosition()
+    private fun initPopupParam() : WindowManager.LayoutParams {
+        return WindowManager.LayoutParams(
+            0,
             0,
             if (Build.VERSION.SDK_INT >= API_APPLICATION_OVERLAY) {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             } else {
                 @Suppress("DEPRECATION")
                 WindowManager.LayoutParams.TYPE_SYSTEM_ALERT
-                // TYPE_SYSTEM_OVERLAYはロック画面にもViewを表示できますが、タッチイベントを取得できません
             },
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    // WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
+            //WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                     WindowManager.LayoutParams.FLAG_FULLSCREEN,
             PixelFormat.TRANSLUCENT
@@ -284,54 +319,32 @@ abstract class CaptureServiceBase(
         }
     }
 
-    private fun setTextParam() {
-        textParam = WindowManager.LayoutParams(
-            0, // 後で上書きする。 loadButtonPosition()
-            0,
-            if (Build.VERSION.SDK_INT >= API_APPLICATION_OVERLAY) {
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            } else {
-                @Suppress("DEPRECATION")
-                WindowManager.LayoutParams.TYPE_SYSTEM_ALERT
-                // TYPE_SYSTEM_OVERLAYはロック画面にもViewを表示できますが、タッチイベントを取得できません
-            },
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    // WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                    WindowManager.LayoutParams.FLAG_FULLSCREEN,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.LEFT or Gravity.TOP
-        }
+    private fun setPopupPos(dm : DisplayMetrics) {
+        val size = Pref.ipTextBoxSize(App1.pref).toFloat().dp2px(dm)
+        popupParam.width = dm.widthPixels
+        popupParam.height = size
+        popupParam.x = 0
+        popupParam.y = size
     }
 
-    private fun setDeletePos() {
-        val dm = resources.displayMetrics
-        val buttonSize2 = Pref.ipCameraButtonSize(App1.pref).toFloat().dp2px(dm)
-        deleteParam.width = buttonSize2
-        deleteParam.height = buttonSize2
-
-        deleteParam.x = clipInt(
-            0,
-            dm.widthPixels - buttonSize,
-            (dm.widthPixels - buttonSize2)/2
-            //fpCameraButtonX(App1.pref).dp2px(dm)
-        )
-
-        deleteParam.y = clipInt(
-            0,
-            dm.heightPixels - buttonSize,
-            dm.heightPixels - buttonSize2*3/2
-            //fpCameraButtonY(App1.pref).dp2px(dm)
-        )
+    private fun setEditPos(dm : DisplayMetrics) {
+        editParam.width = smallButtonSize
+        editParam.height = smallButtonSize
+        editParam.x = clipInt(0, dm.widthPixels - smallButtonSize, dm.widthPixels - smallButtonSize - 20)
+        editParam.y = clipInt(0, dm.heightPixels - smallButtonSize, bigButtonSize)
     }
 
-    private fun setTextPos() {
-        val dm = resources.displayMetrics
+    private fun setDeletePos(dm : DisplayMetrics) {
+        deleteParam.width = bigButtonSize
+        deleteParam.height = bigButtonSize
+        deleteParam.x = clipInt(0, dm.widthPixels - bigButtonSize, (dm.widthPixels - bigButtonSize)/2)
+        deleteParam.y = clipInt(0, dm.heightPixels - bigButtonSize, dm.heightPixels - bigButtonSize*3/2)
+    }
+
+    private fun setTextPos(dm : DisplayMetrics) {
         val size = Pref.ipTextBoxSize(App1.pref).toFloat().dp2px(dm)
         textParam.width = dm.widthPixels
         textParam.height = size
-
         textParam.x = 0
         textParam.y = 0
     }
@@ -343,6 +356,7 @@ abstract class CaptureServiceBase(
         windowManager.removeView(playView)
         windowManager.removeView(deleteView)
         windowManager.removeView(textView)
+        windowManager.removeView(editView)
         stopForeground(true)
 
         if (getServices().isEmpty()) {
@@ -373,25 +387,39 @@ abstract class CaptureServiceBase(
                 stopWithReason("UpdateMediaProjectionFailedAtConfigurationChanged")
             }
         }
-        /*
-            プロセス生成直後、 onCreate の後 onStart** が呼ばれる前に onConfigurationChanged が何度か呼ばれる場合がある。
-            この時は updateMediaProjection() を呼び出して screenCaptureIntent==null で例外を出してサービスを止めてしまってはいけない。
-            既にmediaProjectionが存在する&& キャプチャ中ではない場合のみ updateMediaProjection() を呼び出すべきだ。
-        */
     }
 
     override fun onClick(v: View?) {
         if (v != null) {
             when (v.id) {
                 R.id.btnCamera -> {
-                    captureStart()
                     textBox.text = "  계산중..."
                     textBox.visibility = View.VISIBLE
                     textBoxOn = true
+                    captureStart(3.0f)
                 }
                 R.id.text -> {
                     textBox.visibility = View.GONE
                     textBoxOn = false
+                    btnEdit.visibility = View.GONE
+                    popup.visibility = View.GONE
+                }
+                R.id.btnEdit -> {
+                    popup.visibility = View.VISIBLE
+                    val data = LocalDataManager.getString(applicationContext, txt)
+                    if (data != "") editBox.setText(data)
+                    else editBox.setText(txt)
+
+                    btnEdit.clearFocus()
+                    editBox.requestFocus()
+                    if (editBox.hasFocus()) Log.i("focus", "editText가 포커스를 받음")
+                    val imm = context.getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+
+                    Handler().postDelayed(Runnable(){imm.showSoftInput(editBox, 0)}, 100L)
+                }
+                R.id.editFinish -> {
+                    popup.visibility = View.GONE
+                    LocalDataManager.setString(applicationContext, txt, editBox.text.toString())
                 }
             }
         }
@@ -406,40 +434,20 @@ abstract class CaptureServiceBase(
         }
     }
 
-
-    // 設定からボタン位置を読み直す
-    // ただし反映はされない
     private fun loadButtonPosition() {
         val dm = resources.displayMetrics
-
-        buttonSize = Pref.ipCameraButtonSize(App1.pref).toFloat().dp2px(dm)
-        playParam.width = buttonSize
-        playParam.height = buttonSize
-
-        playParam.x = clipInt(
-            0,
-            dm.widthPixels - buttonSize,
-            dm.widthPixels - buttonSize * 3/2
-            //fpCameraButtonX(App1.pref).dp2px(dm)
-        )
-
-        playParam.y = clipInt(
-            0,
-            dm.heightPixels - buttonSize,
-            dm.heightPixels * 3/5
-            //fpCameraButtonY(App1.pref).dp2px(dm)
-        )
+        playParam.width = bigButtonSize
+        playParam.height = bigButtonSize
+        playParam.x = clipInt(0, dm.widthPixels - bigButtonSize, dm.widthPixels - bigButtonSize * 3/2)
+        playParam.y = clipInt(0, dm.heightPixels - bigButtonSize, dm.heightPixels * 3/5)
     }
 
-    // UIから呼ばれる
     private fun reloadPosition() {
         loadButtonPosition()
         windowManager.updateViewLayout(playView, playParam)
-        btnPlay.updateExclusion()
     }
 
     //////////////////////////////////////////////
-    // 撮影ボタンのドラッグ操作
 
     private var hideByTouching = false
 
@@ -448,16 +456,16 @@ abstract class CaptureServiceBase(
 
         val isCapturing = Capture.isCapturing
 
-        // キャプチャ中はボタンを隠す(操作できない)
         btnPlay.vg(!isCapturing)
 
         val hideByTouching = getServices().find { it.hideByTouching } != null
 
-        // タッチ中かつ非ドラッグ状態ならボタンを隠す(操作はできる)
         if (hideByTouching) {
             btnPlay.background = null
             btnPlay.setImageDrawable(null)
             textBox.visibility = View.GONE
+            btnEdit.visibility = View.GONE
+            popup.visibility = View.GONE
         } else {
             btnPlay.setBackgroundResource(R.drawable.btn_bg_round)
             btnPlay.setImageResource(R.drawable.btn_play)
@@ -480,15 +488,7 @@ abstract class CaptureServiceBase(
         playParam.x = clipInt(0, maxX, startLpX + deltaX.toInt())
         playParam.y = clipInt(0, maxY, startLpY + deltaY.toInt())
 
-        if (save) {
-            val dm = resources.displayMetrics
-            App1.pref.edit()
-                .put(fpCameraButtonX, playParam.x.px2dp(dm))
-                .put(fpCameraButtonY, playParam.y.px2dp(dm))
-                .apply()
-        }
         windowManager.updateViewLayout(playView, playParam)
-        btnPlay.updateExclusion()
         return true
     }
 
@@ -502,8 +502,8 @@ abstract class CaptureServiceBase(
                 startMotionX = ev.rawX
                 startMotionY = ev.rawY
                 draggingThreshold = resources.displayMetrics.density * 8f
-                maxX = dm.widthPixels - buttonSize
-                maxY = dm.heightPixels - buttonSize
+                maxX = dm.widthPixels - bigButtonSize
+                maxY = dm.heightPixels - bigButtonSize
 
                 isDragging = false
                 hideByTouching = true
@@ -524,7 +524,7 @@ abstract class CaptureServiceBase(
                 }
                 btnDelete.visibility = View.GONE
 
-                val dist = buttonSize/2
+                val dist = bigButtonSize/2
                 if (deleteParam.x - dist < playParam.x && playParam.x < deleteParam.x + dist &&
                     deleteParam.y - dist < playParam.y && playParam.y < deleteParam.y + dist) {
                     stopWithReason("StopButton")
@@ -583,11 +583,20 @@ abstract class CaptureServiceBase(
     @SuppressLint("SetTextI18n")
     private fun setText() {
         uiHandler.post {
-            textBox.text = " 인식 : " + txt + "\n" + " 결과 : " + tenkaRecruit.getResult(txt)
+            if (txt != "") btnEdit.visibility = View.VISIBLE
+
+            val data = LocalDataManager.getString(applicationContext, txt)
+            if (data != "") {
+                val tenkaResult = tenkaRecruit.getResult(data)
+                textBox.text = " 인식 : $data\n 결과 : $tenkaResult"
+            } else {
+                val tenkaResult = tenkaRecruit.getResult(txt)
+                textBox.text = " 인식 : $txt\n 결과 : $tenkaResult"
+            }
         }
     }
 
-    private fun captureStart() {
+    private fun captureStart(size: Float) {
         val timeClick = SystemClock.elapsedRealtime()
 
         // don't allow if service is not running
@@ -614,11 +623,13 @@ abstract class CaptureServiceBase(
                 log.w("captureJob try $nTry")
                 try {
                     val captureResult = Capture.capture(
+                        size,
                         context,
                         timeClick,
                         isVideo = false
                     )
                     txt = captureResult.text
+
                     log.w("captureJob captureResult=$captureResult")
                     break
                 } catch (ex: Capture.ScreenCaptureIntentError) {
@@ -667,8 +678,6 @@ abstract class CaptureServiceBase(
 
 }
 
-// サービスが存在しなければ通知を消す
-// 存在するならコールバックを実行する
 fun <T : CaptureServiceBase, R : Any?> T?.runOnService(
     context: Context,
     notificationId: Int? = null,

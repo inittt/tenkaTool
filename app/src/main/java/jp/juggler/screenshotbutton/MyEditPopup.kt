@@ -4,12 +4,11 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.util.AttributeSet
 import android.view.WindowManager
-import android.widget.ImageButton
-import android.widget.TextView
+import android.widget.EditText
+import android.widget.LinearLayout
 
 @SuppressLint("AppCompatCustomView")
-class MyTextBox : TextView {
-
+class MyEditPopup : LinearLayout {
     var windowLayoutParams : WindowManager.LayoutParams? = null
     constructor(context: Context) : super(context, null)
     constructor(context: Context, attrs: AttributeSet?) : super(context, attrs)

@@ -47,7 +47,9 @@
             android:exported="false"
             android:foregroundServiceType="mediaProjection"
             android:stopWithTask="false"
-            tools:targetApi="q" />
+            tools:targetApi="q"
+            android:windowSoftInputMode="stateVisible"
+            />
 
         <receiver android:name=".MyReceiver" />
     </application>

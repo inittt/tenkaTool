@@ -92,8 +92,6 @@ class ActMain : AppCompatActivity() {
         }
     }
 
-    // 権限のチェックと取得インタラクションの開始
-    // 画面表示時や撮影ボタンの表示開始時に呼ばれる
     private fun dispatch() {
         log.d("dispatch")
 
@@ -120,7 +118,6 @@ class ActMain : AppCompatActivity() {
     }
 
     ///////////////////////////////////////////////////////
-    // 保存フォルダの選択と書き込み権限
 
     private fun openSaveTreeUriChooser() {
         arDocumentTree.launch(
@@ -186,7 +183,6 @@ class ActMain : AppCompatActivity() {
     }
 
     /////////////////////////////////////////////////////////////////
-    // オーバーレイ表示の権限
 
     @SuppressLint("InlinedApi")
     private fun prepareOverlay(): Boolean {
@@ -207,12 +203,10 @@ class ActMain : AppCompatActivity() {
     }
 
     private fun handleOverlayResult(): Boolean {
-        // 設定画面から戻るボタンなどで復帰するため、 resultCode が RESULT_OK になることはない
         return canDrawOverlaysCompat(this)
     }
 
     ///////////////////////////////////////////////////
-    // ダイアログの多重表示を防止する
 
 
     private fun AlertDialog.Builder.showEx(): Boolean {

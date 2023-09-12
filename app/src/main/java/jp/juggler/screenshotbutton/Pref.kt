@@ -180,6 +180,10 @@ object Pref {
     // キー名と設定項目のマップ。インポートやアプリ設定で使う
     val map = HashMap<String, BasePref<*>>()
 
+    val smallButton = IntPref(
+        "smallButtonSize",
+        30
+    )
     val ipCameraButtonSize = IntPref(
         "cameraButtonSize",
         40

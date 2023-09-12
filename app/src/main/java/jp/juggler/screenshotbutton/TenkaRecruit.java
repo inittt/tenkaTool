@@ -10,7 +10,7 @@ import java.util.Map;
 import java.util.Set;
 
 public class TenkaRecruit {
-    private Map<String, TAG> str2tag;
+    public Map<String, TAG> str2tag;
     private Map<TAG, String> tag2str;
     private Set<TAG> sr;
     private Map<TAG, Set<NAME>> CH;
@@ -65,19 +65,19 @@ public class TenkaRecruit {
         setCH();
     }
     public String getResult(String txt) {
+        String SRTag = null;
         String[] cur = txt.split(" ");
         if (cur.length != 5) return "인식 오류";
         TAG[] curTags = new TAG[5];
-        String srTag = null;
         for(int i = 0; i < 5; i++) {
             String t = cur[i];
             if (!str2tag.containsKey(t)) return "인식 오류";
             TAG curTag = str2tag.get(t);
             if (curTag == TAG.리더) return "SSR 리더";
-            if (sr.contains(curTag)) srTag = t;
+            if (sr.contains(curTag)) SRTag = t;
             curTags[i] = curTag;
         }
-        if (srTag != null) return "SR " + srTag;
+        if (SRTag != null) return "SR(확정) " + SRTag;
         return getConfirmTag(curTags);
     }
     private String getConfirmTag(TAG[] tg) {
@@ -91,21 +91,39 @@ public class TenkaRecruit {
             combList.add(c2);
             combList.add(c3);
         }
-        for(ArrayList<TAG> tgs : combList) if (isOnlySR(tgs)) {
-            StringBuilder sb = new StringBuilder().append("SR ");
+        int percent = 0, listSize = 0;
+        String res = "";
+        for(ArrayList<TAG> tgs : combList) {
+            int curPercent = srCalc(tgs);
+            if (curPercent == 0) continue;
+
+            StringBuilder sb = new StringBuilder();
             for(TAG t : tgs) sb.append(tag2str.get(t)).append(" ");
-            return sb.toString();
+            String curTags = sb.toString();
+
+            if (percent <= curPercent && listSize <= tgs.size()) {
+                percent = curPercent;
+                listSize = tgs.size();
+                res = curTags;
+            }
         }
-        return "NR";
+        if (percent == 0) return "NR";
+        else if (percent == 100) return "SR(확정) " + res;
+        return "SR(" + percent + "%) " + res;
     }
-    private boolean isOnlySR(ArrayList<TAG> tgs) {
+    private int srCalc(ArrayList<TAG> tgs) {
         ArrayList<Set<NAME>> results = new ArrayList<>();
         for(TAG t : tgs) results.add(CH.get(t));
         Set<NAME> retain = new HashSet<>(results.get(0));
         for(int i = 1; i < results.size(); i++) retain.retainAll(results.get(i));
-        if (retain.size() == 0) return false;
-        for(NAME n : retain) if (n.getValue() > 100) return false;
-        return true;
+        if (retain.size() == 0) return 0;
+
+        int srCnt = 0, cnt = 0;
+        for(NAME n : retain) {
+            cnt++;
+            if (n.getValue() < 100) srCnt++;
+        }
+        return (srCnt * 100) / cnt;
     }
     private void setCH() {
         CH = new HashMap<>();
