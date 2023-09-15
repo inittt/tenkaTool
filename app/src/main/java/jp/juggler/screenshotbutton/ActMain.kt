@@ -4,22 +4,16 @@ import android.annotation.SuppressLint
 import android.app.Dialog
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
-import android.provider.DocumentsContract
 import android.provider.Settings
-import android.text.Editable
-import android.text.TextWatcher
-import android.view.View
-import android.view.ViewGroup
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import jp.juggler.screenshotbutton.databinding.ActMainBinding
 import jp.juggler.util.*
 import java.lang.ref.WeakReference
-import kotlin.math.max
+
 
 class ActMain : AppCompatActivity() {
 
@@ -40,8 +34,6 @@ class ActMain : AppCompatActivity() {
     private var timeStartButtonTappedStill = 0L
     private var timeStartButtonTappedVideo = 0L
 
-    private var videoCaptureEnabled = false
-
     private val arOverlay = ActivityResultHandler {
         mayContinueDispatch(handleOverlayResult())
     }
@@ -61,6 +53,7 @@ class ActMain : AppCompatActivity() {
         App1.prepareAppState(this)
         log.d("onCreate savedInstanceState=$savedInstanceState")
         refActivity = WeakReference(this)
+
         super.onCreate(savedInstanceState)
         //initUI()
     }
@@ -81,8 +74,6 @@ class ActMain : AppCompatActivity() {
     }
 
     /////////////////////////////////////////
-
-    // ActivityResultの処理結果によってdispatchを再実行する
     private fun mayContinueDispatch(r: Boolean) {
         if (r) {
             dispatch()
@@ -96,6 +87,7 @@ class ActMain : AppCompatActivity() {
         log.d("dispatch")
 
         if (!prepareOverlay()) return
+        if (!prepareAccessibility()) return
 
         //if (!prepareSaveTreeUri()) return
 
@@ -104,65 +96,18 @@ class ActMain : AppCompatActivity() {
             if (!Capture.prepareScreenCaptureIntent(arScreenCapture)) return
 
             timeStartButtonTappedStill = 0L
-            ContextCompat.startForegroundService(
-                this,
-                Intent(this, CaptureServiceStill::class.java).apply {
-                    Capture.screenCaptureIntent?.let {
-                        putExtra(CaptureServiceBase.EXTRA_SCREEN_CAPTURE_INTENT, it)
-                    }
+            val intent = Intent(this, CaptureServiceStill::class.java).apply {
+                Capture.screenCaptureIntent?.let {
+                    putExtra(CaptureServiceBase.EXTRA_SCREEN_CAPTURE_INTENT, it)
                 }
-            )
+            }
+            ContextCompat.startForegroundService(this, intent)
             finishAndRemoveTask()
-            //finish()
         }
+
     }
 
     ///////////////////////////////////////////////////////
-
-    private fun openSaveTreeUriChooser() {
-        arDocumentTree.launch(
-            Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
-                if (Build.VERSION.SDK_INT >= API_EXTRA_INITIAL_URI) {
-                    val saveTreeUri = Pref.spSaveTreeUri(App1.pref)
-                    if (saveTreeUri.isNotEmpty()) {
-                        putExtra(
-                            DocumentsContract.EXTRA_INITIAL_URI,
-                            saveTreeUri
-                        )
-                    }
-                }
-            }
-        )
-    }
-
-    private fun prepareSaveTreeUri(): Boolean {
-        val treeUri = Pref.spSaveTreeUri(App1.pref).toUriOrNull()
-
-        if (treeUri != null) {
-            if (!contentResolver.persistedUriPermissions.any { it.uri == treeUri }) {
-                log.eToast(this, true, "missing access permission $treeUri")
-            } else {
-                try {
-                    // pathの検証。例外を出す
-                    pathFromDocumentUriOrThrow(this, treeUri)
-                    return true
-                } catch (ex: Throwable) {
-                    log.eToast(this, ex, "can't use this folder.")
-                }
-            }
-        }
-
-        AlertDialog.Builder(this)
-            .setMessage(R.string.please_select_save_folder)
-            .setPositiveButton(R.string.ok)
-            { _, _ ->
-                openSaveTreeUriChooser()
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .showEx()
-
-        return false
-    }
 
     private fun handleSaveTreeUriResult(resultCode: Int, data: Intent?): Boolean {
         try {
@@ -202,8 +147,28 @@ class ActMain : AppCompatActivity() {
             .showEx()
     }
 
+    @SuppressLint("InlinedApi")
+    private fun prepareAccessibility(): Boolean {
+        if (isAccessibilityServiceEnable(this)) return true
+
+        return AlertDialog.Builder(this)
+            .setMessage(R.string.please_allow_accessibility_permission)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.ok) { _, _ ->
+                val myIntent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                myIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                startActivity(myIntent)
+
+            }
+            .showEx()
+    }
+
     private fun handleOverlayResult(): Boolean {
         return canDrawOverlaysCompat(this)
+    }
+
+    private fun handleAccessibilityResult(): Boolean {
+        return isAccessibilityServiceEnable(this)
     }
 
     ///////////////////////////////////////////////////

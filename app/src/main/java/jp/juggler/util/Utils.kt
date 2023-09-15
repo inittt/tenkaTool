@@ -1,5 +1,6 @@
 package jp.juggler.util
 
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.app.AppOpsManager
 import android.content.Context
 import android.graphics.*
@@ -16,6 +17,7 @@ import android.util.DisplayMetrics
 import android.view.Display
 import android.view.View
 import android.view.WindowManager
+import android.view.accessibility.AccessibilityManager
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat.getSystemService
@@ -136,6 +138,20 @@ fun canDrawOverlaysCompat(context: Context): Boolean {
 
     return false
 
+}
+
+fun isAccessibilityServiceEnable(context: Context): Boolean {
+    val accessibilityManager =
+        (context.getSystemService(AppCompatActivity.ACCESSIBILITY_SERVICE) as AccessibilityManager)
+    val accessibilityServices = accessibilityManager.getEnabledAccessibilityServiceList(
+        AccessibilityServiceInfo.FEEDBACK_ALL_MASK
+    )
+    for (info in accessibilityServices) {
+        if (info.id.contains(context.packageName)) {
+            return true
+        }
+    }
+    return false
 }
 
 fun runOnMainThread(block: () -> Unit) {

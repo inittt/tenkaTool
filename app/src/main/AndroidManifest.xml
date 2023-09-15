@@ -47,9 +47,22 @@
             android:exported="false"
             android:foregroundServiceType="mediaProjection"
             android:stopWithTask="false"
-            tools:targetApi="q"
-            android:windowSoftInputMode="stateVisible"
-            />
+            tools:targetApi="q" />
+
+        <service
+            android:name=".AutoClickService"
+            android:enabled="true"
+            android:label="@string/accessibility_service_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="@string/accessibility_service_name">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService"/>
+            </intent-filter>
+
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/config_accessibility_service"/>
+        </service>
 
         <receiver android:name=".MyReceiver" />
     </application>

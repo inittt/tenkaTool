@@ -34,7 +34,4 @@
         android:text="OK"
         android:padding="0dp"/>
 
-
-
-
 </jp.juggler.screenshotbutton.MyEditPopup>

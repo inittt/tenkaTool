@@ -317,7 +317,7 @@ object Capture {
 
         }
 
-        private suspend fun save(size: Float, image: Image): CaptureResult {
+        private suspend fun save(scaleFactor: Float, image: Image): CaptureResult {
 
             bench("save start")
 
@@ -357,8 +357,6 @@ object Capture {
 //                        if (smallBitmap.isBlank()) error(ERROR_BLANK_IMAGE)
 //                        bench("checkBlank")
 //                    }
-                    // 업샘플링할 비율 정의
-                    val scaleFactor = size // 업샘플링
                     // 업샘플링된 비트맵 생성
                     val scaledBitmap = Bitmap.createScaledBitmap(
                         srcBitmap,
@@ -367,7 +365,7 @@ object Capture {
                         true // 필터링 사용 (보간법 적용)
                     )
 
-                    var screenText = getImageOCR(scaledBitmap)
+                    val screenText = getImageOCR(scaledBitmap)
                     CaptureResult(
                         text = screenText
                     )
@@ -457,7 +455,6 @@ object Capture {
                         val image = imageReader.acquireLatestImage()
                         if (image == null) {
                             log.w("acquireLatestImage() is null")
-                            // 無限リトライ
                             delay(10L)
                             continue
                         }
@@ -474,7 +471,6 @@ object Capture {
                             //bench("save failed")
                             val errMessage = ex.message
                             if (errMessage?.contains(ERROR_BLANK_IMAGE) == true) {
-                                // ブランクイメージは異常ではない場合がありうるのでリトライ回数制限あり
                                 if (++nTry <= maxTry) {
                                     log.w(errMessage)
                                     delay(10L)

@@ -65,7 +65,6 @@ public class TenkaRecruit {
         setCH();
     }
     public String getResult(String txt) {
-        String SRTag = null;
         String[] cur = txt.split(" ");
         if (cur.length != 5) return "인식 오류";
         TAG[] curTags = new TAG[5];
@@ -74,10 +73,9 @@ public class TenkaRecruit {
             if (!str2tag.containsKey(t)) return "인식 오류";
             TAG curTag = str2tag.get(t);
             if (curTag == TAG.리더) return "SSR 리더";
-            if (sr.contains(curTag)) SRTag = t;
+            if (sr.contains(curTag)) return "SR(확정) " + t;
             curTags[i] = curTag;
         }
-        if (SRTag != null) return "SR(확정) " + SRTag;
         return getConfirmTag(curTags);
     }
     private String getConfirmTag(TAG[] tg) {

@@ -1,9 +1,12 @@
 package jp.juggler.screenshotbutton
 
+import android.R.attr.key
+import android.R.attr.value
 import android.annotation.SuppressLint
 import android.app.*
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.graphics.PixelFormat
 import android.os.Build
@@ -14,7 +17,6 @@ import android.os.SystemClock
 import android.util.DisplayMetrics
 import android.util.Log
 import android.view.*
-import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.EditText
 import androidx.core.app.NotificationCompat
@@ -22,6 +24,7 @@ import jp.juggler.util.*
 import kotlinx.coroutines.*
 import java.lang.ref.WeakReference
 import java.util.*
+import kotlin.concurrent.fixedRateTimer
 import kotlin.coroutines.suspendCoroutine
 import kotlin.math.abs
 import kotlin.math.max
@@ -87,15 +90,6 @@ abstract class CaptureServiceBase(
 
     private val log = LogCategory("${App1.tagPrefix}/${this.javaClass.simpleName}")
 
-    val fpCameraButtonX = when {
-        isVideo -> Pref.fpCameraButtonXVideo
-        else -> Pref.fpCameraButtonXStill
-    }
-
-    val fpCameraButtonY = when {
-        isVideo -> Pref.fpCameraButtonYVideo
-        else -> Pref.fpCameraButtonYStill
-    }
 
     private val notificationId = when {
         isVideo -> NOTIFICATION_ID_RUNNING_VIDEO
@@ -115,6 +109,8 @@ abstract class CaptureServiceBase(
 
     private lateinit var btnPlay: MyImageButton
     private lateinit var btnDelete: MyImageButton
+    private lateinit var btnOnOff: MyImageButton
+    private lateinit var btnGoStop: MyImageButton
     private lateinit var textBox: MyTextBox
     private lateinit var btnEdit: MyImageButton
     private lateinit var popup: MyEditPopup
@@ -123,6 +119,8 @@ abstract class CaptureServiceBase(
 
     private lateinit var playParam: WindowManager.LayoutParams
     private lateinit var deleteParam: WindowManager.LayoutParams
+    private lateinit var onOffParam: WindowManager.LayoutParams
+    private lateinit var goStopParam: WindowManager.LayoutParams
     private lateinit var textParam: WindowManager.LayoutParams
     private lateinit var editParam: WindowManager.LayoutParams
     private lateinit var popupParam: WindowManager.LayoutParams
@@ -130,21 +128,34 @@ abstract class CaptureServiceBase(
     private lateinit var playView: View
     private lateinit var deleteView: View
     private lateinit var textView: View
+    private lateinit var onOffView: View
+    private lateinit var goStopView: View
     private lateinit var editView: View
     private lateinit var popupView: View
 
     private var startLpX = 0
     private var startLpY = 0
+    private var startLpXGoStop = 0
+    private var startLpYGoStop = 0
     private var startMotionX = 0f
     private var startMotionY = 0f
+    private var startMotionXGoStop = 0f
+    private var startMotionYGoStop = 0f
     private var isDragging = false
+    private var isDraggingGoStop = false
     private var draggingThreshold = 0f
+    private var draggingThresholdGoStop = 0f
     private var maxX = 0
     private var maxY = 0
+    private var goStopMaxX = 0
+    private var goStopMaxY = 0
     private var bigButtonSize = 0
     private var smallButtonSize = 0
     private var txt = "tmp"
     private var textBoxOn = false
+    private var macroOn = false
+    private var macroGo = false
+    private var editBtnOn = false
 
     private lateinit var tenkaRecruit: TenkaRecruit
 
@@ -157,6 +168,7 @@ abstract class CaptureServiceBase(
         handleIntent(intent)
         return START_STICKY
     }
+
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         log.d("onTaskRemoved")
@@ -211,6 +223,8 @@ abstract class CaptureServiceBase(
         @SuppressLint("InflateParams")
         deleteView = LayoutInflater.from(context).inflate(R.layout.service_overlay_x, null)
         @SuppressLint("InflateParams")
+        onOffView = LayoutInflater.from(context).inflate(R.layout.service_overlay_onoff, null)
+        @SuppressLint("InflateParams")
         textView = LayoutInflater.from(context).inflate(R.layout.test, null)
         @SuppressLint("InflateParams")
         editView = LayoutInflater.from(context).inflate(R.layout.service_edit, null)
@@ -222,30 +236,30 @@ abstract class CaptureServiceBase(
 
         btnPlay = playView.findViewById(R.id.btnCamera)
         btnDelete = deleteView.findViewById(R.id.btnDelete)
+        btnOnOff = onOffView.findViewById(R.id.btnOnOff)
         textBox = textView.findViewById(R.id.text)
         btnEdit = editView.findViewById(R.id.btnEdit)
         popup = popupView.findViewById(R.id.popup)
         editBox = popupView.findViewById(R.id.editBox)
         editFinishBtn = popupView.findViewById(R.id.editFinish)
 
-
         btnPlay.setOnClickListener(this)
         btnPlay.setOnTouchListener(this)
+        btnOnOff.setOnClickListener(this)
         textBox.setOnClickListener(this)
         btnEdit.setOnClickListener(this)
         editFinishBtn.setOnClickListener(this)
 
-
         playParam = initParam()
         deleteParam = initParam()
         textParam = initParam()
+        onOffParam = initParam()
         editParam = initParam()
         popupParam = initPopupParam()
 
         val dm = resources.displayMetrics
         bigButtonSize = Pref.ipCameraButtonSize(App1.pref).toFloat().dp2px(dm)
         smallButtonSize = Pref.smallButton(App1.pref).toFloat().dp2px(dm)
-
 
         setDeletePos(dm)
         btnDelete.windowLayoutParams = deleteParam
@@ -263,9 +277,14 @@ abstract class CaptureServiceBase(
         popup.windowLayoutParams = editParam
         windowManager.addView(popupView, popupParam)
 
-        loadButtonPosition()
+        setSearchPos()
         btnPlay.windowLayoutParams = playParam
+        setOnOffPos()
+        btnOnOff.windowLayoutParams = onOffParam
+
         windowManager.addView(playView, playParam)
+        windowManager.addView(onOffView, onOffParam)
+
 
         btnDelete.setBackgroundResource(R.drawable.btn_bg_round_red)
         btnDelete.setImageResource(R.drawable.ic_delete)
@@ -273,15 +292,36 @@ abstract class CaptureServiceBase(
 
         btnEdit.setImageResource(R.drawable.btn_edit)
         btnEdit.visibility = View.GONE
-
         popup.visibility = View.GONE
 
         textBox.visibility = View.GONE
         textBoxOn = false
+        macroOn = false
+        macroGo = false
         showButtonAll()
     }
 
-    private fun initParam() : WindowManager.LayoutParams {
+    @SuppressLint("ClickableViewAccessibility")
+    private fun setGoStopBtn() {
+        @SuppressLint("InflateParams")
+        goStopView = LayoutInflater.from(context).inflate(R.layout.service_overlay_gostop, null)
+
+        btnGoStop = goStopView.findViewById(R.id.btnGoStop)
+
+        btnGoStop.setOnClickListener(this)
+        btnGoStop.setOnTouchListener(this)
+
+        goStopParam = initParam()
+
+        btnGoStop.setBackgroundResource(R.drawable.btn_bg_round)
+        btnGoStop.setImageResource(R.drawable.btn_play)
+
+        setGoStopPos(resources.displayMetrics)
+        btnGoStop.windowLayoutParams = goStopParam
+        windowManager.addView(goStopView, goStopParam)
+    }
+
+    private fun initParam(): WindowManager.LayoutParams {
         return WindowManager.LayoutParams(
             0,
             0,
@@ -292,6 +332,7 @@ abstract class CaptureServiceBase(
                 WindowManager.LayoutParams.TYPE_SYSTEM_ALERT
             },
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    // WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
                     WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                     WindowManager.LayoutParams.FLAG_FULLSCREEN,
             PixelFormat.TRANSLUCENT
@@ -311,7 +352,7 @@ abstract class CaptureServiceBase(
                 WindowManager.LayoutParams.TYPE_SYSTEM_ALERT
             },
             //WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                     WindowManager.LayoutParams.FLAG_FULLSCREEN,
             PixelFormat.TRANSLUCENT
         ).apply {
@@ -334,11 +375,33 @@ abstract class CaptureServiceBase(
         editParam.y = clipInt(0, dm.heightPixels - smallButtonSize, bigButtonSize)
     }
 
-    private fun setDeletePos(dm : DisplayMetrics) {
+    private fun setDeletePos(dm: DisplayMetrics) {
         deleteParam.width = bigButtonSize
         deleteParam.height = bigButtonSize
         deleteParam.x = clipInt(0, dm.widthPixels - bigButtonSize, (dm.widthPixels - bigButtonSize)/2)
-        deleteParam.y = clipInt(0, dm.heightPixels - bigButtonSize, dm.heightPixels - bigButtonSize*3/2)
+        deleteParam.y = clipInt(0, dm.heightPixels - bigButtonSize, dm.heightPixels - bigButtonSize*2)
+    }
+
+    private fun setOnOffPos() {
+        onOffParam.width = bigButtonSize
+        onOffParam.height = bigButtonSize
+        onOffParam.x = playParam.x
+        onOffParam.y = playParam.y - bigButtonSize
+    }
+
+    private fun setGoStopPos(dm: DisplayMetrics) {
+        goStopParam.width = smallButtonSize
+        goStopParam.height = smallButtonSize
+
+        val mx = LocalDataManager.getInt(applicationContext, "macroX")
+        val my = LocalDataManager.getInt(applicationContext, "macroY")
+        if (mx != -1 && my != -1) {
+            goStopParam.x = mx
+            goStopParam.y = my
+        } else {
+            goStopParam.x = clipInt(0, dm.widthPixels - smallButtonSize, dm.widthPixels * 1 / 2)
+            goStopParam.y = clipInt(0, dm.heightPixels - smallButtonSize, dm.heightPixels * 1 / 2)
+        }
     }
 
     private fun setTextPos(dm : DisplayMetrics) {
@@ -353,11 +416,18 @@ abstract class CaptureServiceBase(
         log.i("onDestroy start. stopReason=${getStopReason(this.javaClass)}")
         removeActiveService(this)
         isDestroyed = true
+        timer?.cancel()
         windowManager.removeView(playView)
         windowManager.removeView(deleteView)
         windowManager.removeView(textView)
+        windowManager.removeView(onOffView)
+        try {
+            windowManager.removeView(goStopView)
+        } catch(e: Exception) {}
         windowManager.removeView(editView)
+        windowManager.removeView(popupView)
         stopForeground(true)
+
 
         if (getServices().isEmpty()) {
             log.i("onDestroy: captureJob join start")
@@ -389,6 +459,7 @@ abstract class CaptureServiceBase(
         }
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     override fun onClick(v: View?) {
         if (v != null) {
             when (v.id) {
@@ -400,22 +471,43 @@ abstract class CaptureServiceBase(
                 }
                 R.id.text -> {
                     textBox.visibility = View.GONE
-                    textBoxOn = false
                     btnEdit.visibility = View.GONE
                     popup.visibility = View.GONE
+                    textBoxOn = false
+                    editBtnOn = false
+                }
+                R.id.btnOnOff -> {
+                    macroOn = !macroOn
+                    macroGo = false
+                    stopMacro()
+                    if (macroOn) {
+                        setGoStopBtn()
+
+                        btnOnOff.setBackgroundResource(R.drawable.btn_bg_round_blue)
+                        btnOnOff.setImageResource(R.drawable.btn_on)
+                    } else {
+                        try {
+                            windowManager.removeView(goStopView)
+                        } catch(e: Exception) {}
+                        btnGoStop.visibility = View.GONE
+                        btnOnOff.setBackgroundResource(R.drawable.btn_bg_round)
+                        btnOnOff.setImageResource(R.drawable.btn_on)
+                    }
+                }
+                R.id.btnGoStop -> {
+                    macroGo = !macroGo
+                    if (macroGo) {
+                        try {
+                            windowManager.removeView(goStopView)
+                        } catch(e: Exception) {}
+                        startMacro()
+                    }
                 }
                 R.id.btnEdit -> {
                     popup.visibility = View.VISIBLE
                     val data = LocalDataManager.getString(applicationContext, txt)
                     if (data != "") editBox.setText(data)
                     else editBox.setText(txt)
-
-                    btnEdit.clearFocus()
-                    editBox.requestFocus()
-                    if (editBox.hasFocus()) Log.i("focus", "editText가 포커스를 받음")
-                    val imm = context.getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
-
-                    Handler().postDelayed(Runnable(){imm.showSoftInput(editBox, 0)}, 100L)
                 }
                 R.id.editFinish -> {
                     popup.visibility = View.GONE
@@ -434,7 +526,7 @@ abstract class CaptureServiceBase(
         }
     }
 
-    private fun loadButtonPosition() {
+    private fun setSearchPos() {
         val dm = resources.displayMetrics
         playParam.width = bigButtonSize
         playParam.height = bigButtonSize
@@ -443,7 +535,7 @@ abstract class CaptureServiceBase(
     }
 
     private fun reloadPosition() {
-        loadButtonPosition()
+        setSearchPos()
         windowManager.updateViewLayout(playView, playParam)
     }
 
@@ -457,19 +549,41 @@ abstract class CaptureServiceBase(
         val isCapturing = Capture.isCapturing
 
         btnPlay.vg(!isCapturing)
+        btnOnOff.vg(!isCapturing)
 
         val hideByTouching = getServices().find { it.hideByTouching } != null
 
         if (hideByTouching) {
             btnPlay.background = null
             btnPlay.setImageDrawable(null)
+            btnOnOff.background = null
+            btnOnOff.setImageDrawable(null)
+
             textBox.visibility = View.GONE
+            try {
+                btnGoStop.visibility = View.GONE
+            } catch(e: Exception) {}
+
             btnEdit.visibility = View.GONE
             popup.visibility = View.GONE
+
+            macroOn = false
+            macroGo = false
+            stopMacro()
         } else {
             btnPlay.setBackgroundResource(R.drawable.btn_bg_round)
-            btnPlay.setImageResource(R.drawable.btn_play)
+            btnPlay.setImageResource(R.drawable.btn_search)
+
+            btnOnOff.setBackgroundResource(R.drawable.btn_bg_round)
+            btnOnOff.setImageResource(R.drawable.btn_on)
+
+            if (macroGo) {
+                try {
+                    btnGoStop.visibility = View.VISIBLE
+                } catch(e: Exception) {}
+            }
             if (textBoxOn) textBox.visibility = View.VISIBLE
+            if (editBtnOn) btnEdit.visibility = View.VISIBLE
         }
     }
 
@@ -486,61 +600,150 @@ abstract class CaptureServiceBase(
             showButtonAll()
         }
         playParam.x = clipInt(0, maxX, startLpX + deltaX.toInt())
-        playParam.y = clipInt(0, maxY, startLpY + deltaY.toInt())
+        playParam.y = clipInt(bigButtonSize, maxY, startLpY + deltaY.toInt())
+        onOffParam.x = playParam.x
+        onOffParam.y = playParam.y - bigButtonSize
 
         windowManager.updateViewLayout(playView, playParam)
+        windowManager.updateViewLayout(onOffView, onOffParam)
+        return true
+    }
+
+    private fun updateDraggingGoStop(
+        ev: MotionEvent,
+        save: Boolean = false
+    ): Boolean {
+        val deltaX = ev.rawX - startMotionXGoStop
+        val deltaY = ev.rawY - startMotionYGoStop
+        if (!isDraggingGoStop) {
+            if (max(abs(deltaX), abs(deltaY)) < draggingThresholdGoStop) return false
+            isDraggingGoStop = true
+        }
+        goStopParam.x = clipInt(0, goStopMaxX, startLpXGoStop + deltaX.toInt())
+        goStopParam.y = clipInt(0, goStopMaxY + smallButtonSize, startLpYGoStop + deltaY.toInt())
+
+        windowManager.updateViewLayout(goStopView, goStopParam)
         return true
     }
 
     override fun onTouch(v: View?, ev: MotionEvent): Boolean {
-        if (v?.id != R.id.btnCamera) return false
-        when (ev.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                val dm = resources.displayMetrics
-                startLpX = playParam.x
-                startLpY = playParam.y
-                startMotionX = ev.rawX
-                startMotionY = ev.rawY
-                draggingThreshold = resources.displayMetrics.density * 8f
-                maxX = dm.widthPixels - bigButtonSize
-                maxY = dm.heightPixels - bigButtonSize
+        when(v?.id) {
+            R.id.btnCamera -> {
+                when (ev.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        val dm = resources.displayMetrics
+                        startLpX = playParam.x
+                        startLpY = playParam.y
+                        startMotionX = ev.rawX
+                        startMotionY = ev.rawY
+                        draggingThreshold = resources.displayMetrics.density * 8f
+                        maxX = dm.widthPixels - bigButtonSize
+                        maxY = dm.heightPixels - bigButtonSize
 
-                isDragging = false
-                hideByTouching = true
-                showButtonAll()
+                        isDragging = false
+                        hideByTouching = true
+                        showButtonAll()
 
-                btnDelete.visibility = View.VISIBLE
-                return true
-            }
+                        btnDelete.visibility = View.VISIBLE
+                        return true
+                    }
 
-            MotionEvent.ACTION_MOVE -> {
-                updateDragging(ev)
-                return true
-            }
+                    MotionEvent.ACTION_MOVE -> {
+                        updateDragging(ev)
+                        return true
+                    }
 
-            MotionEvent.ACTION_UP -> {
-                if (!updateDragging(ev, save = true)) {
-                    v.performClick()
+                    MotionEvent.ACTION_UP -> {
+                        if (!updateDragging(ev, save = true)) {
+                            v.performClick()
+                        }
+                        btnDelete.visibility = View.GONE
+
+                        val dist = bigButtonSize / 2
+                        if (deleteParam.x - dist < playParam.x && playParam.x < deleteParam.x + dist &&
+                            deleteParam.y - dist < playParam.y && playParam.y < deleteParam.y + dist
+                        ) {
+                            stopWithReason("StopButton")
+                        }
+                        return true
+                    }
+
+                    MotionEvent.ACTION_CANCEL -> {
+                        if (!updateDragging(ev, save = true)) {
+                            hideByTouching = false
+                            showButtonAll()
+                        }
+                        return true
+                    }
                 }
-                btnDelete.visibility = View.GONE
+                return false
+            }
+            R.id.btnGoStop -> {
+                when (ev.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        val dm = resources.displayMetrics
+                        startLpXGoStop = goStopParam.x
+                        startLpYGoStop = goStopParam.y
+                        startMotionXGoStop = ev.rawX
+                        startMotionYGoStop = ev.rawY
+                        draggingThresholdGoStop = resources.displayMetrics.density * 8f
+                        goStopMaxX = dm.widthPixels - smallButtonSize
+                        goStopMaxY = dm.heightPixels - smallButtonSize
 
-                val dist = bigButtonSize/2
-                if (deleteParam.x - dist < playParam.x && playParam.x < deleteParam.x + dist &&
-                    deleteParam.y - dist < playParam.y && playParam.y < deleteParam.y + dist) {
-                    stopWithReason("StopButton")
+                        isDraggingGoStop = false
+                        return true
+                    }
+
+                    MotionEvent.ACTION_MOVE -> {
+                        updateDraggingGoStop(ev)
+                        return true
+                    }
+
+                    MotionEvent.ACTION_UP -> {
+                        LocalDataManager.setInt(applicationContext, "macroX", goStopParam.x)
+                        LocalDataManager.setInt(applicationContext, "macroY", goStopParam.y)
+                        if (!updateDraggingGoStop(ev, save = true)) {
+                            v.performClick()
+                        }
+                        return true
+                    }
+
+                    MotionEvent.ACTION_CANCEL -> {
+                        if (!updateDraggingGoStop(ev, save = true)) {
+                            showButtonAll()
+                        }
+                        return true
+                    }
                 }
-                return true
+                return false
             }
-            MotionEvent.ACTION_CANCEL -> {
-                if (!updateDragging(ev, save = true)) {
-                    hideByTouching = false
-                    showButtonAll()
-                }
-                return true
-            }
+            else -> {return false}
         }
-        return false
     }
+
+    private var timer: Timer? = null
+    private fun stopMacro() {
+        if (autoClickService == null) Log.i("alert", "autoClickService is null")
+        Log.i("macro", "macro off")
+        timer?.cancel()
+    }
+
+    private fun startMacro() {
+        if (autoClickService == null) Log.i("alert", "autoClickService is null")
+
+        btnGoStop.setOnClickListener(null)
+        btnGoStop.isClickable = false
+        btnGoStop.isFocusable = false
+
+        val x = goStopParam.x + smallButtonSize/2
+        val y = goStopParam.y + smallButtonSize*3/2
+        Log.i("macro", "macro on x : $x, y : $y")
+
+        timer = fixedRateTimer(initialDelay = 0, period = 1000) {
+            autoClickService?.click(x, y)
+        }
+    }
+
 
     ///////////////////////////////////////////////////////////////
 
@@ -574,16 +777,15 @@ abstract class CaptureServiceBase(
         stopSelf()
     }
 
-    fun captureStop() {
-        Capture.stopVideo()
-    }
-
     private val uiHandler = Handler(Looper.getMainLooper())
 
     @SuppressLint("SetTextI18n")
     private fun setText() {
         uiHandler.post {
-            if (txt != "") btnEdit.visibility = View.VISIBLE
+            if (txt != "") {
+                editBtnOn = true
+                btnEdit.visibility = View.VISIBLE
+            }
 
             val data = LocalDataManager.getString(applicationContext, txt)
             if (data != "") {
@@ -667,7 +869,6 @@ abstract class CaptureServiceBase(
             setText()
         })
     }
-
 
     abstract fun createNotificationChannel(channelId: String)
 

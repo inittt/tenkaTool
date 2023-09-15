@@ -9,7 +9,6 @@ import android.widget.TextView
 
 @SuppressLint("AppCompatCustomView")
 class MyTextBox : TextView {
-
     var windowLayoutParams : WindowManager.LayoutParams? = null
     constructor(context: Context) : super(context, null)
     constructor(context: Context, attrs: AttributeSet?) : super(context, attrs)

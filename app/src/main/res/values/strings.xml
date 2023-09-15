@@ -36,7 +36,8 @@
     <string name="save_folder">Save folder</string>
     <string name="not_selected">Not selected</string>
 
-    <string name="please_allow_overlay_permission">Please allow Overlay permission.\n\nNote: After change setting, please back to this app.</string>
+    <string name="please_allow_overlay_permission">다른 앱 위에 표시를 허용해 주세요.\n\n세팅이 끝나면 다시 앱으로 돌아와 진행할 수 있습니다.</string>
+    <string name="please_allow_accessibility_permission">접근성 권한을 허용해 주세요.\n\n제한된 설정일 경우 앱 설정에서 Allow restricted settings를 선택하여 접근성 권한 허용이 가능합니다.</string>
     <string name="please_select_save_folder">Please select save folder.\n\nNote: To show all storage, please open menu on top-right corner, select "show storage", then open menu on top-left corner and select storage.\n\nAlso you can create new folder from menu on top-right corner.</string>
 
     <string name="still_settings">Still settings</string>
@@ -61,4 +62,7 @@
     <string name="start_at_device_boot">start at device boot completed</string>
     <string name="textview">TextView</string>
 
+    <string name="accessibility_service_description">TODO</string>
+    <string name="accessibility_service_name">#Tenka Tool#</string>
+    <string name="accessibility_service_id">com.github.nestorm001.autoclicker/.service.AutoClickService</string>
 </resources>
