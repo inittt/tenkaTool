@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<jp.juggler.screenshotbutton.MyEditPopup xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/popup"
+    android:layout_width="match_parent"
+    android:layout_height="80dp"
+    android:layout_weight="1"
+    android:textColor="#FFFFFF"
+    android:textSize="20sp"
+    android:gravity="center"
+    android:background="#CC000000"
+    android:orientation="vertical"
+    android:padding="5dp">
+
+    <EditText
+        android:id="@+id/editBox"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:autofillHints="태그 입력"
+        android:text="editable = true"
+        android:padding="5dp"
+        android:inputType="text"
+        tools:ignore="LabelFor,TextFields"
+        android:background="#FFFFFFFF"
+        android:paddingTop="2sp"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        />
+
+    <Button
+        android:id="@+id/editFinish"
+        android:layout_width="60dp"
+        android:layout_height="35dp"
+        android:text="OK"
+        android:padding="0dp"/>
+
+
+
+
+</jp.juggler.screenshotbutton.MyEditPopup>

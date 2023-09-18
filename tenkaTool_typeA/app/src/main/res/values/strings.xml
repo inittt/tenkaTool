@@ -1,0 +1,64 @@
+<resources>
+    <string name="app_name" translatable="false">Tenka Tool</string>
+
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="start">Start</string>
+    <string name="stop">Stop</string>
+    <string name="share">Share</string>
+    <string name="record">Record</string>
+    <string name="delete">Delete</string>
+    <string name="close">Close</string>
+    <string name="back">Back</string>
+    <string name="edit">Edit</string>
+
+    <string name="capture_button">Showing capture button</string>
+    <string name="still">Still</string>
+    <string name="video">Video</string>
+
+    <string name="overlay_button_desc">You can move the overlay button by dragging.\nNotice if Android 10+ System Gesture Navigation is enabled, the buttons on the edge may not respond.</string>
+    <string name="video_settings_desc">Depending on the settings, capturing may stop because the video compression process can not keep up real time.</string>
+
+    <string name="capture_standby_still">Capture standby (Still)</string>
+    <string name="capture_standby_description_still">Showing overlay button on the screen.</string>
+
+    <string name="capture_standby_video">Capture standby (Video)</string>
+    <string name="capture_standby_description_video">Showing overlay button on the screen.</string>
+
+    <string name="capture_standby_video_recording">Video capture running</string>
+    <string name="capture_standby_description_video_recording">Recording in progress</string>
+
+    <string name="reset_position">Reset position</string>
+
+    <string name="overlay_button_size">Overlay button size (unit:dp. restart required)</string>
+    <string name="button_size_error"><![CDATA[Please input integer >= 1]]></string>
+
+    <string name="save_folder">Save folder</string>
+    <string name="not_selected">Not selected</string>
+
+    <string name="please_allow_overlay_permission">Please allow Overlay permission.\n\nNote: After change setting, please back to this app.</string>
+    <string name="please_select_save_folder">Please select save folder.\n\nNote: To show all storage, please open menu on top-right corner, select "show storage", then open menu on top-left corner and select storage.\n\nAlso you can create new folder from menu on top-right corner.</string>
+
+    <string name="still_settings">Still settings</string>
+    <string name="video_settings">Video settings</string>
+    <string name="other_settings">Other settings</string>
+
+    <string name="show_post_view_after_capture">Show post view after capture</string>
+    <string name="save_png">Save as PNG file (very slow)</string>
+    <string name="codec">Codec</string>
+    <string name="frame_rate">Frame rate</string>
+    <string name="bit_rate">Bit rate(bps)</string>
+    <string name="color_format">Color format</string>
+    <string name="video_codec_missing">Video capturing is unavailable because this device has no video codec.</string>
+    <string name="media_muxer_too_old">Video capturing is unavailable because this app requires Android 8+ MediaMuxer API.</string>
+    <string name="output_log_to_file">Output debug log to file</string>
+    <string name="output_log_to_file_desc">If enabled, the debug log is output to the folder %1$s</string>
+    <string name="status_is">Status: %1$s</string>
+    <string name="status_running">Running</string>
+    <string name="stopped_by">Stopped by: %1$s</string>
+    <string name="stop_recording">Stop recording</string>
+    <string name="trouble_shooting">Trouble shooting</string>
+    <string name="start_at_device_boot">start at device boot completed</string>
+    <string name="textview">TextView</string>
+
+</resources>

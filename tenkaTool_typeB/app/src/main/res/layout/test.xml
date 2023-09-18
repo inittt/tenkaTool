@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<jp.juggler.screenshotbutton.MyTextBox xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/text"
+    android:layout_width="match_parent"
+    android:layout_height="83dp"
+    android:layout_weight="1"
+    android:text="표시될 영역"
+    android:textColor="#FFFFFF"
+    android:textSize="18sp"
+    android:gravity="center_vertical"
+    android:background="#CC000000"/>
