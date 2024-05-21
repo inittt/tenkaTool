@@ -1,0 +1,20 @@
+{
+  "version": 3,
+  "artifactType": {
+    "type": "APK",
+    "kind": "Directory"
+  },
+  "applicationId": "jp.juggler.tenkaTool2",
+  "variantName": "release",
+  "elements": [
+    {
+      "type": "SINGLE",
+      "filters": [],
+      "attributes": [],
+      "versionCode": 7,
+      "versionName": "7.0pre",
+      "outputFile": "../../tenkaTool2-release-7-7.0pre-20240117_010838.apk"
+    }
+  ],
+  "elementType": "File"
+}

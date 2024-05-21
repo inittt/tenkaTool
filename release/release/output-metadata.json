@@ -1,0 +1,20 @@
+{
+  "version": 3,
+  "artifactType": {
+    "type": "APK",
+    "kind": "Directory"
+  },
+  "applicationId": "jp.juggler.tenkaTool",
+  "variantName": "release",
+  "elements": [
+    {
+      "type": "SINGLE",
+      "filters": [],
+      "attributes": [],
+      "versionCode": 10,
+      "versionName": "11.0pre",
+      "outputFile": "../../tenkaTool-release-10-11.0pre-20240218_211925.apk"
+    }
+  ],
+  "elementType": "File"
+}

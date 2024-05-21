@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#008577</color>
+    <color name="colorPrimaryDark">#00574B</color>
+    <color name="colorAccent">#D81B60</color>
+    <color name="colorLauncherIconBackground">#eeeeee</color>
+    <color name="colorLauncherIconForeground">#222222</color>
+    <color name="colorText">#000</color>
+    <color name="colorTextSecondary">#000</color>
+    <color name="colorTextError">#FF0000</color>
+    <color name="colorSettingBorder">#777777</color>
+    <color name="colorRippleEffect">#777777</color>
+
+</resources>
